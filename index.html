@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JPSS Data Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to top for better content flow */
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 32px;
+            width: 100%;
+            max-width: 800px; /* Increased max-width for better layout with buttons */
+            box-sizing: border-box;
+            margin-top: 50px; /* Add some top margin */
+        }
+        .form-group label {
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .form-group select,
+        .form-group input[type="date"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            color: #334155;
+            background-color: #f8fafc;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .form-group select:focus,
+        .form-group input[type="date"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+        }
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+            transform: translateY(-1px);
+        }
+        .btn-primary:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px rgba(59, 130, 246, 0.3);
+        }
+        .results-area {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+            min-height: 150px;
+            max-height: 400px; /* Limit height for scrollability */
+            overflow-y: auto;
+            color: #334155;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            white-space: pre-wrap; /* Preserve whitespace and wrap text */
+            word-break: break-all; /* Break long words */
+        }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: none; /* Hidden by default */
+            margin-left: 12px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error-message {
+            color: #ef4444;
+            background-color: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        /* Custom radio button styling */
+        .radio-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .radio-group label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            background-color: #f8fafc;
+            color: #475569;
+            font-weight: 500;
+            flex-grow: 1; /* Allow items to grow to fill space */
+            text-align: center;
+        }
+        .radio-group input[type="radio"] {
+            display: none; /* Hide the actual radio button */
+        }
+        .radio-group input[type="radio"]:checked + label {
+            background-color: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+            box-shadow: 0 2px 5px rgba(59, 130, 246, 0.3);
+        }
+        .radio-group label:hover {
+            border-color: #93c5fd;
+            background-color: #e0f2fe;
+        }
+        .radio-group input[type="radio"]:checked + label:hover {
+            background-color: #2563eb;
+        }
+        .radio-group.satellite-selection label {
+            min-width: 100px; /* Ensure consistent width for satellites */
+        }
+
+        /* Style for selectable list items */
+        .selectable-list-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .selectable-list-item:last-child {
+            border-bottom: none;
+        }
+        .selectable-list-item input[type="checkbox"] {
+            margin-right: 10px;
+            transform: scale(1.2); /* Make checkbox slightly larger */
+            cursor: pointer;
+        }
+        .selectable-list-item span {
+            flex-grow: 1;
+            word-break: break-all;
+        }
+
+        /* Styles for the info pane */
+        .info-pane details {
+            background-color: #eff6ff; /* Light blue background */
+            border: 1px solid #bfdbfe; /* Blue border */
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        .info-pane summary {
+            font-weight: 600;
+            color: #1e40af; /* Darker blue for summary text */
+            cursor: pointer;
+            list-style: none; /* Hide default arrow */
+            display: flex;
+            align-items: center;
+        }
+        .info-pane summary::-webkit-details-marker {
+            display: none; /* Hide default arrow for Webkit browsers */
+        }
+        .info-pane summary::before {
+            content: '▶'; /* Custom arrow */
+            margin-right: 8px;
+            transition: transform 0.2s ease-in-out;
+        }
+        .info-pane details[open] summary::before {
+            content: '▼'; /* Custom arrow when open */
+            transform: rotate(90deg);
+        }
+        .info-pane ul {
+            list-style: disc;
+            margin-left: 20px;
+            margin-top: 10px;
+            color: #334155;
+            font-size: 0.9rem;
+        }
+        .info-pane ul ul { /* Nested lists */
+            list-style: circle;
+            margin-left: 20px;
+        }
+        .info-pane p {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #334155;
+        }
+        .info-pane table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: 0.85rem;
+        }
+        .info-pane th, .info-pane td {
+            border: 1px solid #cbd5e1;
+            padding: 8px;
+            text-align: left;
+        }
+        .info-pane th {
+            background-color: #e0f2fe;
+            font-weight: 600;
+            color: #1e40af;
+        }
+        .info-pane tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+    </style>
+</head>
+
+<body class="antialiased">
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">JPSS Data Explorer</h1>
+
+        <div class="form-group mb-6">
+            <label class="mb-2">Satellite:</label>
+            <div id="satelliteSelectionRadios" class="radio-group satellite-selection">
+                <!-- Satellite radio buttons populated by JavaScript -->
+            </div>
+            <div id="currentBucketDisplay" class="text-sm text-gray-600 mt-2 p-2 bg-gray-50 rounded-md">
+                <!-- Current bucket name displayed here -->
+            </div>
+        </div>
+
+        <div class="form-group mb-6">
+            <label for="instrumentSelect" class="mb-2">Instrument:</label>
+            <select id="instrumentSelect" class="focus:ring-blue-500 focus:border-blue-500">
+                <!-- Instruments populated by JavaScript -->
+            </select>
+        </div>
+
+        <div class="form-group mb-6">
+            <label for="productTypeSelect" class="mb-2">Product Type:</label>
+            <select id="productTypeSelect" class="focus:ring-blue-500 focus:border-blue-500">
+                <!-- Product types populated by JavaScript -->
+            </select>
+        </div>
+
+        <!-- Product Mapping Cheat Sheet Info Pane -->
+        <div class="info-pane mb-6">
+            <details>
+                <summary>JPSS Product Information</summary>
+                <div class="content mt-2">
+                    <p class="mb-4">This section provides information about JPSS products and their S3 directory paths.</p>
+
+                    <h4 class="font-semibold text-gray-700 mb-2">JPSS Product to S3 Path Mapping:</h4>
+                    <table class="w-full text-left table-auto border border-collapse border-gray-300 rounded-lg overflow-hidden">
+                        <thead>
+                            <tr>
+                                <th class="px-4 py-2 bg-blue-100 text-blue-800">Display Name</th>
+                                <th class="px-4 py-2 bg-blue-100 text-blue-800">S3 Product Directory Name</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productMappingTableBody">
+                            <!-- Product mappings populated by JavaScript -->
+                        </tbody>
+                    </table>
+                    <p class="mt-4">JPSS data is typically organized as: `S3_BUCKET/Product_Directory_Name/YYYY/MM/DD/filename.h5`</p>
+                </div>
+            </details>
+        </div>
+
+        <div class="form-group mb-6">
+            <label for="dateInput" class="mb-2">Date (UTC):</label>
+            <input type="date" id="dateInput" class="focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div class="grid grid-cols-2 gap-6 mb-8">
+            <div class="form-group">
+                <label for="hourSelect" class="mb-2">Hour (UTC):</label>
+                <select id="hourSelect" class="focus:ring-blue-500 focus:border-blue-500"></select>
+            </div>
+            <div class="form-group">
+                <label for="minuteSelect" class="mb-2">Minute (UTC):</label>
+                <select id="minuteSelect" class="focus:ring-blue-500 focus:border-blue-500"></select>
+            </div>
+        </div>
+
+        <div class="form-group mb-6">
+            <label for="timeDeltaSlider" class="mb-2 flex justify-between items-center">
+                <span>Time Delta (Minutes):</span>
+                <span id="timeDeltaValue" class="font-normal text-gray-600">5 min</span>
+            </label>
+            <input type="range" id="timeDeltaSlider" min="0" max="60" value="5" step="1" class="w-full h-2 bg-blue-100 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75">
+        </div>
+
+
+        <div class="form-group mb-6">
+            <label for="currentPrefix" class="mb-2">Generated S3 Prefix (for QC):</label>
+            <div id="currentPrefix" class="results-area text-sm bg-gray-100 p-3 rounded-md break-words">
+                <!-- S3 prefix will be displayed here -->
+            </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+            <button id="queryButton" class="btn-primary flex items-center w-full sm:w-auto justify-center">
+                Query S3
+                <div id="loadingSpinner" class="loading-spinner"></div>
+            </button>
+            <button id="downloadButton" class="btn-primary flex items-center w-full sm:w-auto justify-center" style="display: none;">
+                Download Selected Files
+            </button>
+            <button id="selectAllButton" class="btn-primary flex items-center w-full sm:w-auto justify-center" style="display: none;">
+                Select All
+            </button>
+            <button id="openMyHDF5Button" class="btn-primary flex items-center w-full sm:w-auto justify-center" style="display: none;">
+                Open in myhdf5.hdfgroup.org (Direct View)
+            </button>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+        <div id="instructionMessage" class="error-message bg-green-100 text-green-700 border-green-300" style="display: none;"></div>
+
+
+        <h2 class="text-xl font-semibold text-gray-700 mb-4">Results:</h2>
+        <div id="results" class="results-area">
+            Enter your query parameters and click "Query S3" to see results.
+        </div>
+
+        <div class="text-center text-gray-600 text-sm mt-8 p-4 bg-white rounded-lg shadow-inner">
+            <p class="mb-2">Downloaded files can be viewed directly in your browser using <a href="https://myhdf5.hdfgroup.org/" target="_blank" class="text-blue-600 hover:text-blue-800 font-semibold transition-colors duration-200">myhdf5.hdfgroup.org</a>.</p>
+            <p><a href="https://github.com/coliveir-aer/jpss-data-explorer" target="_blank" class="text-blue-600 hover:text-blue-800 font-semibold transition-colors duration-200">JPSS Data Explorer GitHub Project</a></p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const satelliteSelectionRadiosDiv = document.getElementById('satelliteSelectionRadios');
+            const instrumentSelect = document.getElementById('instrumentSelect');
+            const productTypeSelect = document.getElementById('productTypeSelect');
+            const productMappingTableBody = document.getElementById('productMappingTableBody');
+            const dateInput = document.getElementById('dateInput');
+            const hourSelect = document.getElementById('hourSelect');
+            const minuteSelect = document.getElementById('minuteSelect');
+            const timeDeltaSlider = document.getElementById('timeDeltaSlider');
+            const timeDeltaValueSpan = document.getElementById('timeDeltaValue');
+            const queryButton = document.getElementById('queryButton');
+            const downloadButton = document.getElementById('downloadButton');
+            const selectAllButton = document.getElementById('selectAllButton');
+            const openMyHDF5Button = document.getElementById('openMyHDF5Button');
+            const resultsDiv = document.getElementById('results');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const errorMessageDiv = document.getElementById('errorMessage');
+            const instructionMessageDiv = document.getElementById('instructionMessage');
+            // Removed myHDF5InstructionDiv as the element is removed from HTML.
+            const currentPrefixDisplay = document.getElementById('currentPrefix');
+            const currentBucketDisplay = document.getElementById('currentBucketDisplay');
+
+            // Define available JPSS satellites
+            const satellites = [
+                { value: "noaa-nesdis-n20-pds", label: "NOAA-20" },
+                { value: "noaa-nesdis-n21-pds", label: "NOAA-21" },
+                { value: "noaa-nesdis-snpp-pds", label: "SNPP" }
+            ];
+
+            // Define JPSS product types and their display names / S3 directory names with instruments and wavelengths
+            const productTypes = [
+                { "value": "ATMS-SCIENCE-RDR", "label": "ATMS Science RDR", "instrument": "ATMS" },
+                { "value": "ATMS-SDR-GEO", "label": "ATMS SDR Geolocation", "instrument": "ATMS" },
+                { "value": "ATMS-SDR", "label": "ATMS SDR", "instrument": "ATMS" },
+                { "value": "ATMS-SFR", "label": "ATMS SFR", "instrument": "ATMS" },
+                { "value": "ATMS-TDR", "label": "ATMS TDR", "instrument": "ATMS" },
+                { "value": "ATMS_BUFR", "label": "ATMS BUFR", "instrument": "ATMS" },
+
+                { "value": "CrIS-FS-SDR", "label": "CrIS Full Spectral SDR", "instrument": "CrIS" },
+                { "value": "CRIS-SCIENCE-RDR", "label": "CrIS Science RDR", "instrument": "CrIS" },
+                { "value": "CrIS-SDR-GEO", "label": "CrIS SDR Geolocation", "instrument": "CrIS" },
+
+                { "value": "GCRSO-SCRIF", "label": "GCRSO SCRIF", "instrument": "General" },
+                { "value": "CLASS_NAGG", "label": "CLASS NAGG", "instrument": "General" },
+
+                { "value": "GRIDDED_VIIRS_LSA_DLY", "label": "Gridded VIIRS LSA Daily", "instrument": "VIIRS" },
+                { "value": "GRIDDED_VIIRS_LST_D", "label": "Gridded VIIRS LST Day", "instrument": "VIIRS" },
+                { "value": "GRIDDED_VIIRS_LST_N", "label": "Gridded VIIRS LST Night", "instrument": "VIIRS" },
+                { "value": "GVF_GLB", "label": "GVF Global", "instrument": "VIIRS" },
+                { "value": "GVF_REG", "label": "GVF Regional", "instrument": "VIIRS" },
+                { "value": "JPSSRR_LST", "label": "JPSSRR Land Surface Temperature", "instrument": "VIIRS" },
+                { "value": "JPSSRR_SnowCover", "label": "JPSSRR Snow Cover", "instrument": "VIIRS" },
+                { "value": "JPSSRR_SurfAlb", "label": "JPSSRR Surface Albedo", "instrument": "VIIRS" },
+
+                { "value": "Mission-Schedule-AUX", "label": "Mission Schedule AUX", "instrument": "General" },
+
+                { "value": "NPR_MIRS_IMG", "label": "NPR MiRS Imagery", "instrument": "MiRS" },
+                { "value": "NPR_MIRS_IMG_33min", "label": "NPR MiRS Imagery 33min", "instrument": "MiRS" },
+                { "value": "NPR_MIRS_SND", "label": "NPR MiRS Sounding", "instrument": "MiRS" },
+                { "value": "NPR_MIRS_SND_33min", "label": "NPR MiRS Sounding 33min", "instrument": "MiRS" },
+
+                { "value": "NUCAPS-EDR", "label": "NUCAPS EDR", "instrument": "NUCAPS" },
+                { "value": "NUCAPS_C0431_BUFR", "label": "NUCAPS C0431 BUFR", "instrument": "NUCAPS" },
+                { "value": "NUCAPS_C2211_BUFR", "label": "NUCAPS C2211 BUFR", "instrument": "NUCAPS" },
+
+                { "value": "OMPS-NP-GEO", "label": "OMPS Nadir Profiler Geolocation", "instrument": "OMPS" },
+                { "value": "OMPS-NP-SDR", "label": "OMPS Nadir Profiler SDR", "instrument": "OMPS" },
+                { "value": "OMPS-TC-GEO", "label": "OMPS Total Column Geolocation", "instrument": "OMPS" },
+                { "value": "OMPS-TC-SDR", "label": "OMPS Total Column SDR", "instrument": "OMPS" },
+                { "value": "OMPS_V8TOZ", "label": "OMPS V8TOZ", "instrument": "OMPS" },
+
+                { "value": "reprocessed", "label": "Reprocessed Data (General)", "instrument": "General" },
+                { "value": "SFR_ATMS", "label": "SFR ATMS", "instrument": "ATMS" },
+                { "value": "TLE-AUX", "label": "TLE AUX", "instrument": "General" },
+                { "value": "VI_BWKL_GLB", "label": "VI BWKL Global", "instrument": "VIIRS" },
+                { "value": "VI_BWKL_REG", "label": "VI BWKL Regional", "instrument": "VIIRS" },
+                { "value": "VI_DLY_GLB", "label": "VI Daily Global", "instrument": "VIIRS" },
+                { "value": "VI_DLY_REG", "label": "VI Daily Regional", "instrument": "VIIRS" },
+                { "value": "VI_WKL_GLB", "label": "VI Weekly Global", "instrument": "VIIRS" },
+                { "value": "VI_WKL_REG", "label": "VI Weekly Regional", "instrument": "VIIRS" },
+                { "value": "VIIRS-AF-Iband-EDR", "label": "VIIRS Active Fires I-band EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS-DNB-GEO", "label": "VIIRS Day/Night Band Geolocation", "instrument": "VIIRS" },
+                { "value": "VIIRS-DNB-SDR", "label": "VIIRS Day/Night Band SDR", "instrument": "VIIRS" },
+                { "value": "VIIRS-I1-IMG-EDR", "label": "VIIRS I1 Imagery EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS-I1-SDR", "label": "VIIRS I1 SDR (0.64 µm)", "instrument": "VIIRS", "wavelength": 0.64 },
+                { "value": "VIIRS-I2-IMG-EDR", "label": "VIIRS I2 Imagery EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS-I2-SDR", "label": "VIIRS I2 SDR (0.86 µm)", "instrument": "VIIRS", "wavelength": 0.86 },
+                { "value": "VIIRS-I3-IMG-EDR", "label": "VIIRS I3 Imagery EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS-I3-SDR", "label": "VIIRS I3 SDR (1.61 µm)", "instrument": "VIIRS", "wavelength": 1.61 },
+                { "value": "VIIRS-I4-IMG-EDR", "label": "VIIRS I4 Imagery EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS-I4-SDR", "label": "VIIRS I4 SDR (3.74 µm)", "instrument": "VIIRS", "wavelength": 3.74 },
+                { "value": "VIIRS-I5-IMG-EDR", "label": "VIIRS I5 Imagery EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS-I5-SDR", "label": "VIIRS I5 SDR (11.45 µm)", "instrument": "VIIRS", "wavelength": 11.45 },
+                { "value": "VIIRS-IMG-GEO-TC", "label": "VIIRS Imagery Geolocation True Color", "instrument": "VIIRS" },
+                { "value": "VIIRS-IMG-GEO", "label": "VIIRS Imagery Geolocation", "instrument": "VIIRS" },
+                { "value": "VIIRS-IMG-GTM-EDR-GEO", "label": "VIIRS Imagery GTM EDR Geolocation", "instrument": "VIIRS" },
+                { "value": "VIIRS-JRR-ADP", "label": "VIIRS Joint-Res Aerosol Detection Product", "instrument": "VIIRS" },
+                { "value": "VIIRS-JRR-AOD", "label": "VIIRS Joint-Res Aerosol Optical Depth", "instrument": "VIIRS" },
+                { "value": "VIIRS-JRR-CloudBase", "label": "VIIRS Joint-Res Cloud Base", "instrument": "VIIRS" },
+                { "value": "VIIRS-JRR-CloudCoverLayers", "label": "VIIRS Joint-Res Cloud Cover Layers", "instrument": "VIIRS" },
+                { "value": "VIIRS-JRR-CloudDCOMP", "label": "VIIRS Joint-Res Cloud DCOMP", "instrument": "VIIRS" },
+                { "value": "VIIRS-JRR-CloudHeight", "label": "VIIRS Joint-Res Cloud Height", "instrument": "VIIRS" },
+                { "value": "VIIRS-JRR-CloudMask", "label": "VIIRS Joint-Res Cloud Mask", "instrument": "VIIRS" },
+                { "value": "VIIRS-JRR-CloudNCOMP", "label": "VIIRS Joint-Res Cloud NCOMP", "instrument": "VIIRS" },
+                { "value": "VIIRS-JRR-CloudPhase", "label": "VIIRS Joint-Res Cloud Phase", "instrument": "VIIRS" },
+                { "value": "VIIRS-JRR-IceAge", "label": "VIIRS Joint-Res Ice Age", "instrument": "VIIRS" },
+                { "value": "VIIRS-JRR-IceConcentration", "label": "VIIRS Joint-Res Ice Concentration", "instrument": "VIIRS" },
+                { "value": "VIIRS-JRR-VolcanicAsh", "label": "VIIRS Joint-Res Volcanic Ash", "instrument": "VIIRS" },
+                { "value": "VIIRS-M1-SDR", "label": "VIIRS M1 SDR (0.41 µm)", "instrument": "VIIRS", "wavelength": 0.41 },
+                { "value": "VIIRS-M1ST-EDR", "label": "VIIRS M1ST EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS-M2-SDR", "label": "VIIRS M2 SDR (0.44 µm)", "instrument": "VIIRS", "wavelength": 0.44 },
+                { "value": "VIIRS-M2ND-EDR", "label": "VIIRS M2ND EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS-M3-SDR", "label": "VIIRS M3 SDR (0.48 µm)", "instrument": "VIIRS", "wavelength": 0.48 },
+                { "value": "VIIRS-M3RD-EDR", "label": "VIIRS M3RD EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS-M4-SDR", "label": "VIIRS M4 SDR (0.55 µm)", "instrument": "VIIRS", "wavelength": 0.55 },
+                { "value": "VIIRS-M4TH-EDR", "label": "VIIRS M4TH EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS-M5-SDR", "label": "VIIRS M5 SDR (0.67 µm)", "instrument": "VIIRS", "wavelength": 0.67 },
+                { "value": "VIIRS-M5TH-EDR", "label": "VIIRS M5TH EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS-M6-SDR", "label": "VIIRS M6 SDR (0.75 µm)", "instrument": "VIIRS", "wavelength": 0.75 },
+                { "value": "VIIRS-M6TH-EDR", "label": "VIIRS M6TH EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS-M7-SDR", "label": "VIIRS M7 SDR (0.86 µm)", "instrument": "VIIRS", "wavelength": 0.86 },
+                { "value": "VIIRS-M8-SDR", "label": "VIIRS M8 SDR (1.24 µm)", "instrument": "VIIRS", "wavelength": 1.24 },
+                { "value": "VIIRS-M9-SDR", "label": "VIIRS M9 SDR (1.38 µm)", "instrument": "VIIRS", "wavelength": 1.38 },
+                { "value": "VIIRS-M10-SDR", "label": "VIIRS M10 SDR (1.61 µm)", "instrument": "VIIRS", "wavelength": 1.61 },
+                { "value": "VIIRS-M11-SDR", "label": "VIIRS M11 SDR (2.25 µm)", "instrument": "VIIRS", "wavelength": 2.25 },
+                { "value": "VIIRS-M12-SDR", "label": "VIIRS M12 SDR (3.70 µm)", "instrument": "VIIRS", "wavelength": 3.70 },
+                { "value": "VIIRS-M13-SDR", "label": "VIIRS M13 SDR (4.05 µm)", "instrument": "VIIRS", "wavelength": 4.05 },
+                { "value": "VIIRS-M14-SDR", "label": "VIIRS M14 SDR (8.55 µm)", "instrument": "VIIRS", "wavelength": 8.55 },
+                { "value": "VIIRS-M15-SDR", "label": "VIIRS M15 SDR (10.70 µm)", "instrument": "VIIRS", "wavelength": 10.70 },
+                { "value": "VIIRS-M16-SDR", "label": "VIIRS M16 SDR (12.00 µm)", "instrument": "VIIRS", "wavelength": 12.00 },
+                { "value": "VIIRS-MOD-GEO-TC", "label": "VIIRS MOD Geolocation True Color", "instrument": "VIIRS" },
+                { "value": "VIIRS-MOD-GEO", "label": "VIIRS MOD Geolocation", "instrument": "VIIRS" },
+                { "value": "VIIRS-MOD-GTM-EDR-GEO", "label": "VIIRS MOD GTM EDR Geolocation", "instrument": "VIIRS" },
+                { "value": "VIIRS-NCC-EDR-GEO", "label": "VIIRS NCC EDR Geolocation", "instrument": "VIIRS" },
+                { "value": "VIIRS-NCC-EDR", "label": "VIIRS NCC EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS_EFIRE_VIIRSI_EDR", "label": "VIIRS EFIRE VIIRSI EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS_I_IMG_EDR_TIP", "label": "VIIRS I Imagery EDR TIP", "instrument": "VIIRS" },
+                { "value": "VIIRS_M1_EDR_TIP", "label": "VIIRS M1 EDR TIP", "instrument": "VIIRS" },
+                { "value": "VIIRS_NCC_EDR_TIPD10_KNES", "label": "VIIRS NCC EDR TIPD10 KNES", "instrument": "VIIRS" },
+                { "value": "VIIRS_NCC_EDR_TIPH10_KNES", "label": "VIIRS NCC EDR TIPH10 KNES", "instrument": "VIIRS" },
+                { "value": "VIIRS_NCC_EDR_TIPP10_KNES", "label": "VIIRS NCC EDR TIPP10 KNES", "instrument": "VIIRS" },
+                { "value": "VIIRS_SurfaceReflectance_EDR", "label": "VIIRS Surface Reflectance EDR", "instrument": "VIIRS" },
+                { "value": "VIIRS_VFM_MWS_MOSAIC", "label": "VIIRS VFM MWS MOSAIC", "instrument": "VIIRS" }
+            ];
+
+            // Populate Satellite radio buttons
+            satellites.forEach((sat, index) => {
+                const input = document.createElement('input');
+                input.type = 'radio';
+                input.id = `satellite-${sat.value.replace(/\./g, '-')}`;
+                input.name = 'satellite';
+                input.value = sat.value;
+                if (sat.value === "noaa-nesdis-n20-pds") input.checked = true;
+
+                const label = document.createElement('label');
+                label.htmlFor = `satellite-${sat.value.replace(/\./g, '-')}`;
+                label.textContent = sat.label;
+
+                satelliteSelectionRadiosDiv.appendChild(input);
+                satelliteSelectionRadiosDiv.appendChild(label);
+            });
+
+            // Function to update the displayed bucket name
+            function updateBucketDisplay() {
+                const selectedSatelliteRadio = document.querySelector('input[name="satellite"]:checked');
+                if (selectedSatelliteRadio) {
+                    currentBucketDisplay.textContent = `Current S3 Bucket: ${selectedSatelliteRadio.value}`;
+                } else {
+                    currentBucketDisplay.textContent = 'Please select a satellite.';
+                }
+            }
+
+            // Populate Instrument dropdown and set up its change listener
+            function populateInstrumentSelect() {
+                const instruments = [...new Set(productTypes.map(p => p.instrument))].sort();
+                instrumentSelect.innerHTML = '';
+                instruments.forEach(instrument => {
+                    const option = document.createElement('option');
+                    option.value = instrument;
+                    option.textContent = instrument;
+                    instrumentSelect.appendChild(option);
+                });
+                instrumentSelect.value = "VIIRS";
+                updateProductTypeSelect();
+            }
+
+            // Function to populate Product Type dropdown and info table based on selected instrument
+            function updateProductTypeSelect() {
+                const selectedInstrument = instrumentSelect.value;
+                let filteredProducts = productTypes.filter(p => p.instrument === selectedInstrument);
+
+                // Sort specifically for VIIRS SDRs by wavelength, then alphabetically by label
+                if (selectedInstrument === "VIIRS") {
+                    filteredProducts.sort((a, b) => {
+                        const aLabel = a.label || '';
+                        const bLabel = b.label || '';
+
+                        if (typeof a.wavelength === 'number' && typeof b.wavelength === 'number') {
+                            return a.wavelength - b.wavelength;
+                        }
+                        return aLabel.localeCompare(bLabel);
+                    });
+                } else {
+                    // For other instruments, just sort alphabetically by label
+                    filteredProducts.sort((a, b) => {
+                        const aLabel = a.label || '';
+                        const bLabel = b.label || '';
+                        return aLabel.localeCompare(bLabel)
+                    });
+                }
+
+                // Clear current product types and table
+                productTypeSelect.innerHTML = '';
+                productMappingTableBody.innerHTML = '';
+
+                if (filteredProducts.length > 0) {
+                    filteredProducts.forEach((type) => {
+                        const option = document.createElement('option');
+                        option.value = type.value;
+                        option.textContent = type.label;
+                        productTypeSelect.appendChild(option);
+
+                        const row = productMappingTableBody.insertRow();
+                        const cell1 = row.insertCell(0);
+                        const cell2 = row.insertCell(1);
+                        cell1.textContent = type.label;
+                        cell2.textContent = type.value;
+                    });
+                    // Set default product type to VIIRS I5 SDR if available, otherwise select the first product
+                    productTypeSelect.value = "VIIRS-I5-SDR";
+                    if (productTypeSelect.value !== "VIIRS-I5-SDR" && filteredProducts.length > 0) {
+                        productTypeSelect.value = filteredProducts[0].value;
+                    }
+                } else {
+                    const option = document.createElement('option');
+                    option.value = "";
+                    option.textContent = "No products for this instrument";
+                    productTypeSelect.appendChild(option);
+                }
+                updatePrefixDisplay();
+            }
+
+            // Add event listener for instrument change
+            instrumentSelect.addEventListener('change', updateProductTypeSelect);
+
+            // Populate Hour and Minute Selectors
+            for (let i = 0; i < 24; i++) {
+                const option = document.createElement('option');
+                option.value = String(i).padStart(2, '0');
+                option.textContent = String(i).padStart(2, '0');
+                hourSelect.appendChild(option);
+            }
+            for (let i = 0; i < 60; i++) {
+                const option = document.createElement('option');
+                option.value = String(i).padStart(2, '0');
+                option.textContent = String(i).padStart(2, '0');
+                minuteSelect.appendChild(option);
+            }
+
+            // Set default date/time to 1 hour before current UTC time
+            const nowUtc = new Date();
+            nowUtc.setUTCHours(nowUtc.getUTCHours() - 1);
+            nowUtc.setUTCMinutes(0);
+            nowUtc.setUTCSeconds(0);
+            nowUtc.setUTCMilliseconds(0);
+
+            const defaultDate = nowUtc.toISOString().slice(0, 10);
+            const defaultHour = String(nowUtc.getUTCHours()).padStart(2, '0');
+            const defaultMinute = String(nowUtc.getUTCMinutes()).padStart(2, '0');
+
+            dateInput.value = defaultDate;
+            hourSelect.value = defaultHour;
+            minuteSelect.value = defaultMinute;
+
+            // Initialize time delta slider and its display
+            timeDeltaValueSpan.textContent = `${timeDeltaSlider.value} min`;
+            timeDeltaSlider.addEventListener('input', () => {
+                timeDeltaValueSpan.textContent = `${timeDeltaSlider.value} min`;
+                updatePrefixDisplay();
+            });
+
+            // Function to get the current S3 prefix based on user selections
+            function getCurrentS3Prefix() {
+                const productType = productTypeSelect.value;
+                const dateVal = dateInput.value;
+
+                if (!productType || !dateVal) {
+                    return "Please make all selections to generate prefix.";
+                }
+
+                const dt = new Date(dateVal + 'T00:00:00Z');
+                if (isNaN(dt.getTime())) {
+                    return "Invalid date. Please correct.";
+                }
+
+                const year = dt.getUTCFullYear();
+                const month = String(dt.getUTCMonth() + 1).padStart(2, '0');
+                const day = String(dt.getUTCDate()).padStart(2, '0');
+
+                // JPSS S3 prefix structure: Product/Year/Month/Day/
+                return `${productType}/${year}/${month}/${day}/`;
+            }
+
+            // Function to extract time from filename (e.g., SVI01_j01_d20250605_t0004511_e0006156_b39096_c20250605004921681000_oebc_ops.h5)
+            // It expects a filename and comes back with an object { hour: number, minute: number } or null if not found
+            function parseTimeFromFilename(filename) {
+                // Regex looks for "_t" followed by 7 digits, then "_"
+                const timeMatch = filename.match(/_t(\d{7})_/);
+                if (timeMatch && timeMatch[1]) {
+                    const timeString = timeMatch[1];
+                    const hour = parseInt(timeString.substring(0, 2), 10);
+                    const minute = parseInt(timeString.substring(2, 4), 10);
+                    // Check for valid hour/minute
+                    if (!isNaN(hour) && hour >= 0 && hour <= 23 && !isNaN(minute) && minute >= 0 && minute <= 59) {
+                        return { hour, minute };
+                    }
+                }
+                return null;
+            }
+
+            // Function to update the displayed S3 prefix
+            function updatePrefixDisplay() {
+                const prefix = getCurrentS3Prefix();
+                const selectedTime = `${hourSelect.value}:${minuteSelect.value}`;
+                const timeDelta = timeDeltaSlider.value;
+                currentPrefixDisplay.textContent = `${prefix} (Filtering around ${selectedTime} +/- ${timeDelta} min)`;
+            }
+
+            // Add event listeners to update displays on change
+            satelliteSelectionRadiosDiv.addEventListener('change', () => {
+                updateBucketDisplay();
+                updatePrefixDisplay();
+            });
+            productTypeSelect.addEventListener('change', updatePrefixDisplay);
+            dateInput.addEventListener('change', updatePrefixDisplay);
+            hourSelect.addEventListener('change', updatePrefixDisplay);
+            minuteSelect.addEventListener('change', updatePrefixDisplay);
+
+            // Initial setup calls
+            populateInstrumentSelect();
+            updateBucketDisplay();
+            updatePrefixDisplay();
+
+            queryButton.addEventListener('click', async () => {
+                const selectedSatelliteRadio = document.querySelector('input[name="satellite"]:checked');
+                const productType = productTypeSelect.value;
+                const dateVal = dateInput.value;
+                const selectedHour = parseInt(hourSelect.value, 10);
+                const selectedMinute = parseInt(minuteSelect.value, 10);
+                const timeDelta = parseInt(timeDeltaSlider.value, 10);
+
+                if (!selectedSatelliteRadio) {
+                    displayError("Please select a Satellite (NOAA-20, NOAA-21, or SNPP).");
+                    return;
+                }
+                if (!productType) {
+                    displayError("Please select a Product Type.");
+                    return;
+                }
+                if (!dateVal || isNaN(selectedHour) || isNaN(selectedMinute) || isNaN(timeDelta)) {
+                    displayError("Please select a valid date, hour, minute, and time delta.");
+                    return;
+                }
+
+                const bucketName = selectedSatelliteRadio.value;
+                const s3Region = 'us-east-1'; // All JPSS buckets are in us-east-1
+
+                const prefix = getCurrentS3Prefix();
+
+                resultsDiv.innerHTML = 'Querying S3...';
+                resultsDiv.classList.remove('text-red-500');
+                hideError();
+                hideInstruction();
+                // hideMyHDF5Instruction(); // Removed as the element is removed from HTML
+                showLoading();
+                downloadButton.style.display = 'none';
+                selectAllButton.style.display = 'none';
+                openMyHDF5Button.style.display = 'none';
+
+                let allFoundKeys = [];
+                let continuationToken = undefined;
+                let isTruncated = true;
+
+                try {
+                    while (isTruncated) {
+                        // Construct the URL for S3 ListObjectsV2 API
+                        let url = `https://${bucketName}.s3.${s3Region}.amazonaws.com/?list-type=2&prefix=${encodeURIComponent(prefix)}`;
+                        if (continuationToken) {
+                            url += `&continuation-token=${encodeURIComponent(continuationToken)}`;
+                        }
+
+                        const response = await fetch(url);
+
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            throw new Error(`HTTP error! Status: ${response.status}, Body: ${errorText}`);
+                        }
+
+                        const responseText = await response.text();
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(responseText, "application/xml");
+
+                        const errorNode = xmlDoc.querySelector('Error');
+                        if (errorNode) {
+                            const errorCode = errorNode.querySelector('Code')?.textContent;
+                            const errorMessage = errorNode.querySelector('Message')?.textContent;
+                            throw new Error(`S3 Error: ${errorCode} - ${errorMessage}`);
+                        }
+
+                        const contents = xmlDoc.querySelectorAll('Contents');
+                        contents.forEach(item => {
+                            const key = item.querySelector('Key')?.textContent;
+                            if (key && !key.endsWith('/')) { // Ensure it's a file, not a directory
+                                allFoundKeys.push(key);
+                            }
+                        });
+
+                        const isTruncatedNode = xmlDoc.querySelector('IsTruncated');
+                        isTruncated = isTruncatedNode && isTruncatedNode.textContent === 'true';
+
+                        const nextContinuationTokenNode = xmlDoc.querySelector('NextContinuationToken');
+                        continuationToken = nextContinuationTokenNode ? nextContinuationTokenNode.textContent : undefined;
+                    }
+
+                    // Calculate the target time in minutes from midnight
+                    const targetTimeInMinutes = selectedHour * 60 + selectedMinute;
+
+                    // Calculate the lower and upper bounds for filtering within the same day
+                    const lowerBoundInMinutes = targetTimeInMinutes - timeDelta;
+                    const upperBoundInMinutes = targetTimeInMinutes + timeDelta;
+
+                    // Client-side filtering based on selected hour and minute and time delta
+                    const filteredKeys = allFoundKeys.filter(key => {
+                        const filename = key.split('/').pop();
+                        const timeInFilename = parseTimeFromFilename(filename);
+
+                        if (timeInFilename) {
+                            const fileTimeInMinutes = timeInFilename.hour * 60 + timeInFilename.minute;
+                            // Check if the file's time falls within the allowed delta range
+                            return fileTimeInMinutes >= lowerBoundInMinutes && fileTimeInMinutes <= upperBoundInMinutes;
+                        }
+                        return false;
+                    });
+
+                    hideLoading();
+                    if (filteredKeys.length > 0) {
+                        displayResults(filteredKeys);
+                        downloadButton.style.display = 'flex';
+                        selectAllButton.style.display = 'flex';
+                        selectAllButton.textContent = 'Select All';
+                        openMyHDF5Button.style.display = 'flex';
+                        // showMyHDF5Instruction(); // Removed as the element is removed from HTML
+                    } else {
+                        displayResults("No object keys found for the specified criteria within the selected time window. Please double-check the date/time, product type, and time delta. Data for the very latest hours might not be immediately available.");
+                        selectAllButton.style.display = 'none';
+                        openMyHDF5Button.style.display = 'none';
+                        // hideMyHDF5Instruction(); // Removed as the element is removed from HTML
+                    }
+
+                } catch (error) {
+                    hideLoading();
+                    console.error("Error querying S3:", error);
+                    displayError(`Failed to query S3: ${error.message || "An unknown error occurred."}`);
+                    selectAllButton.style.display = 'none';
+                    openMyHDF5Button.style.display = 'none';
+                    // hideMyHDF5Instruction(); // Removed as the element is removed from HTML
+                }
+            });
+
+            downloadButton.addEventListener('click', async () => {
+                const selectedCheckboxes = resultsDiv.querySelectorAll('input[type="checkbox"]:checked');
+                if (selectedCheckboxes.length === 0) {
+                    displayError("Please select at least one file to download.");
+                    return;
+                }
+
+                hideError();
+                hideInstruction();
+                // hideMyHDF5Instruction(); // Removed as the element is removed from HTML
+
+                if (selectedCheckboxes.length > 1) {
+                    displayInstruction(`Starting ${selectedCheckboxes.length} downloads... Please check your browser's download bar or pop-up blocker if you don't see them.`);
+                    setTimeout(() => {
+                        hideInstruction();
+                    }, 5000);
+                }
+
+                for (let i = 0; i < selectedCheckboxes.length; i++) {
+                    const checkbox = selectedCheckboxes[i];
+                    const s3Key = checkbox.value;
+                    const selectedSatelliteRadio = document.querySelector('input[name="satellite"]:checked');
+                    const bucketName = selectedSatelliteRadio ? selectedSatelliteRadio.value : 'noaa-nesdis-n20-pds';
+                    const s3Region = 'us-east-1';
+                    const downloadUrl = `https://${bucketName}.s3.${s3Region}.amazonaws.com/${s3Key}`;
+
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    link.target = '_blank';
+                    link.download = s3Key.split('/').pop();
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    // Add a small delay between multiple downloads to prevent browser blocking
+                    if (i < selectedCheckboxes.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                    }
+                }
+            });
+
+            // Event listener for the main "Select All" button (for file results)
+            selectAllButton.addEventListener('click', () => {
+                const checkboxes = resultsDiv.querySelectorAll('input[type="checkbox"]');
+                const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+
+                checkboxes.forEach(cb => {
+                    cb.checked = !allChecked; // Toggle the checked state
+                });
+
+                // Update button text based on new state
+                selectAllButton.textContent = allChecked ? 'Select All' : 'Deselect All';
+            });
+
+            // Event listener for the new "Open in myhdf5.hdfgroup.org" button
+            openMyHDF5Button.addEventListener('click', () => {
+                const selectedCheckboxes = resultsDiv.querySelectorAll('input[type="checkbox"]:checked');
+                if (selectedCheckboxes.length !== 1) {
+                    displayError("Please select exactly ONE file to open in myhdf5.hdfgroup.org.");
+                    return;
+                }
+
+                hideError();
+                hideInstruction();
+                // hideMyHDF5Instruction(); // Removed as the element is removed from HTML
+
+                const checkbox = selectedCheckboxes[0];
+                const s3Key = checkbox.value;
+                const selectedSatelliteRadio = document.querySelector('input[name="satellite"]:checked');
+                const bucketName = selectedSatelliteRadio ? selectedSatelliteRadio.value : 'noaa-nesdis-n20-pds';
+                const s3Region = 'us-east-1';
+                const fileUrl = `https://${bucketName}.s3.${s3Region}.amazonaws.com/${s3Key}`;
+
+                // URL-encode the S3 file URL
+                const encodedFileUrl = encodeURIComponent(fileUrl);
+                const myHDF5DirectViewUrl = `https://myhdf5.hdfgroup.org/view?url=${encodedFileUrl}`;
+
+                // Open myhdf5.hdfgroup.org in a new tab with the direct view URL
+                window.open(myHDF5DirectViewUrl, '_blank');
+            });
+
+
+            function displayResults(keys) {
+                resultsDiv.innerHTML = '';
+                if (Array.isArray(keys) && keys.length > 0) {
+                    keys.forEach(key => {
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = 'selectable-list-item';
+
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.value = key;
+                        checkbox.id = `key-${key.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+                        const label = document.createElement('label');
+                        label.htmlFor = checkbox.id;
+                        label.textContent = key;
+                        label.style.cursor = 'pointer';
+
+                        itemDiv.appendChild(checkbox);
+                        itemDiv.appendChild(label);
+                        resultsDiv.appendChild(itemDiv);
+                    });
+                } else if (typeof keys === 'string') {
+                    resultsDiv.textContent = keys;
+                } else {
+                    resultsDiv.textContent = "No object keys found for the specified criteria.";
+                }
+            }
+
+            function showLoading() {
+                queryButton.disabled = true;
+                loadingSpinner.style.display = 'block';
+            }
+
+            function hideLoading() {
+                queryButton.disabled = false;
+                loadingSpinner.style.display = 'none';
+            }
+
+            function displayError(message) {
+                errorMessageDiv.textContent = message;
+                errorMessageDiv.style.display = 'block';
+                resultsDiv.innerHTML = '';
+                downloadButton.style.display = 'none';
+                selectAllButton.style.display = 'none';
+                openMyHDF5Button.style.display = 'none';
+                hideLoading();
+                hideInstruction();
+                // hideMyHDF5Instruction(); // Removed as the element is removed from HTML
+            }
+
+            function hideError() {
+                errorMessageDiv.style.display = 'none';
+                errorMessageDiv.textContent = '';
+            }
+
+            function displayInstruction(message) {
+                instructionMessageDiv.textContent = message;
+                instructionMessageDiv.style.display = 'block';
+            }
+
+            function hideInstruction() {
+                instructionMessageDiv.style.display = 'none';
+                instructionMessageDiv.textContent = '';
+            }
+
+            /*
+            Removed showMyHDF5Instruction and hideMyHDF5Instruction functions
+            function showMyHDF5Instruction() {
+                myHDF5InstructionDiv.style.display = 'block';
+            }
+
+            function hideMyHDF5Instruction() {
+                myHDF5InstructionDiv.style.display = 'none';
+            }
+            */
+        });
+    </script>
+</body>
+</html>
